@@ -3,7 +3,7 @@ import spacy
 from torchtext.datasets import TranslationDataset, Multi30k
 from torchtext.data import Field, BucketIterator
 
-def get_data(batch_size, device, reverse=True):
+def get_data(batch_size, device, reverse=False):
     def tokenize_de(text):
         """
         Tokenizes German text from a string into a list of strings (tokens) and reverses it
