@@ -1,4 +1,4 @@
-# Paper: https://arxiv.org/abs/1409.3215
+# Paper: Sequence to Sequence Learning with Neural Networks - https://arxiv.org/abs/1409.3215
 # Original Tutorial: https://github.com/bentrevett/pytorch-seq2seq/blob/master/1%20-%20Sequence%20to%20Sequence%20Learning%20with%20Neural%20Networks.ipynb
 
 
@@ -6,9 +6,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-from torchtext.datasets import TranslationDataset, Multi30k
-from torchtext.data import Field, BucketIterator
 
 from tqdm import tqdm
 
@@ -19,56 +16,10 @@ import random
 import math
 import time
 
-# DATA PREPROCESSING
-def get_data(batch_size):
-    def tokenize_de(text):
-        """
-        Tokenizes German text from a string into a list of strings (tokens) and reverses it
-        """
-        return [tok.text for tok in spacy_de.tokenizer(text)][::-1]
-
-    def tokenize_en(text):
-        """
-        Tokenizes English text from a string into a list of strings (tokens)
-        """
-        return [tok.text for tok in spacy_en.tokenizer(text)]
-
-    spacy_de = spacy.load('de')
-    spacy_en = spacy.load('en')
-
-    SRC = Field(tokenize = tokenize_de, 
-                init_token = '<sos>', 
-                eos_token = '<eos>', 
-                lower = True)
-
-    TRG = Field(tokenize = tokenize_en, 
-                init_token = '<sos>', 
-                eos_token = '<eos>', 
-                lower = True)
-
-    train_data, valid_data, test_data = Multi30k.splits(exts = ('.de', '.en'), fields = (SRC, TRG))
-
-    print(f"Number of training examples: {len(train_data.examples)}")
-    print(f"Number of validation examples: {len(valid_data.examples)}")
-    print(f"Number of testing examples: {len(test_data.examples)}")
-
-    training_data_head = [vars(train_data.examples[i]) for i in range(5)]
-    print(*training_data_head, sep='\n')
-
-    SRC.build_vocab(train_data, min_freq = 2)
-    TRG.build_vocab(train_data, min_freq = 2)
-    print(f"Unique tokens in source (de) vocabulary: {len(SRC.vocab)}")
-    print(f"Unique tokens in target (en) vocabulary: {len(TRG.vocab)}")
-
-    train_iterator, valid_iterator, test_iterator = BucketIterator.splits(
-        (train_data, valid_data, test_data), 
-        batch_size = batch_size, 
-        device = device)
-
-    return train_iterator, valid_iterator, test_iterator, SRC, TRG
-
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+from data import get_data
+from helpers import count_parameters, epoch_time, set_seed
+from evaluate import evaluate
+from train import train
 
 def init_weights(m):
     for name, param in m.named_parameters():
@@ -204,84 +155,12 @@ class Seq2Seq(nn.Module):
         
         return outputs
 
-def train(model, iterator, optimizer, criterion, clip):
-    model.train()
-    epoch_loss = 0
-    
-    for i, batch in tqdm(enumerate(iterator), total=len(iterator), desc="Train"):
-        src = batch.src
-        trg = batch.trg
-        
-        optimizer.zero_grad()
-        
-        output = model(src, trg)
-        
-        #trg = [trg len, batch size]
-        #output = [trg len, batch size, output dim]
-        output_dim = output.shape[-1]
-        
-        output = output[1:].view(-1, output_dim)
-        trg = trg[1:].view(-1)
-        
-        #trg = [(trg len - 1) * batch size]
-        #output = [(trg len - 1) * batch size, output dim]
-        loss = criterion(output, trg)
-        
-        loss.backward()
-        
-        torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
-        
-        optimizer.step()
-        
-        epoch_loss += loss.item()
-        
-    return epoch_loss / len(iterator)
-
-def evaluate(model, iterator, criterion):
-    model.eval()
-    epoch_loss = 0
-    
-    with torch.no_grad():
-        for i, batch in tqdm(enumerate(iterator), total=len(iterator), desc="Validate"):
-            src = batch.src
-            trg = batch.trg
-
-            output = model(src, trg, 0) #turn off teacher forcing
-
-            #trg = [trg len, batch size]
-            #output = [trg len, batch size, output dim]
-            output_dim = output.shape[-1]
-            
-            output = output[1:].view(-1, output_dim)
-            trg = trg[1:].view(-1)
-
-            #trg = [(trg len - 1) * batch size]
-            #output = [(trg len - 1) * batch size, output dim]
-            loss = criterion(output, trg)
-            
-            epoch_loss += loss.item()
-        
-    return epoch_loss / len(iterator)
-
-def epoch_time(start_time, end_time):
-    elapsed_time = end_time - start_time
-    elapsed_mins = int(elapsed_time / 60)
-    elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
-    return elapsed_mins, elapsed_secs
-
-def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
-
 set_seed(42)
 
 BATCH_SIZE = 128
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-train_iterator, valid_iterator, test_iterator, SRC, TRG = get_data(BATCH_SIZE)
+train_iterator, valid_iterator, test_iterator, SRC, TRG = get_data(BATCH_SIZE, device)
 
 INPUT_DIM = len(SRC.vocab)
 OUTPUT_DIM = len(TRG.vocab)
