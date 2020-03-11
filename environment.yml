@@ -1,0 +1,11 @@
+name: torch-seq2seq
+channels:
+- conda-forge
+- pytorch
+- powerai
+dependencies:
+- spacy
+- pytorch
+- torchtext
+- sentencepiece
+- matplotlib
