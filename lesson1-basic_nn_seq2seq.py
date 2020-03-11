@@ -141,7 +141,6 @@ class Seq2Seq(nn.Module):
         input = trg[0,:]
         
         for t in range(1, trg_len):
-            
             #insert input token embedding, previous hidden and previous cell states
             #receive output tensor (predictions) and new hidden and cell states
             output, hidden, cell = self.decoder(input, hidden, cell)

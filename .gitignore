@@ -110,3 +110,4 @@ dmypy.json
 ### Other ###
 .data
 *model.pt
+*attention.png

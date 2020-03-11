@@ -74,7 +74,6 @@ class Encoder(nn.Module):
         
         #outputs = [src len, batch size, enc hid dim * 2]
         #hidden = [batch size, dec hid dim]
-        
         return outputs, hidden
 
 
